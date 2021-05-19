@@ -1,0 +1,12 @@
+{
+  "service":{
+    "port": "2339",
+    "enableTLS": false
+  },
+  "microserviceTLSCerts": {
+    "basePath": "./certs/",
+    "caCert": "rootCA.crt",
+    "serverKey": "DOMAIN.key",
+    "serverCert": "DOMAIN.crt"
+  }
+}
