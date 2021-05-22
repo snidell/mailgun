@@ -5,7 +5,7 @@ to start the service you can run: `./service` the service defaults to port 1337
 you can override the port it listens to by passing the port flag like this `./service --port=1338`
 
 
-i created a local docker file for postgres and ran it on a custom port running the following command:
+I created a local docker file for postgres and ran it on a custom port running the following command:
 `docker run -d --name mailgun-postgres -e POSTGRES_PASSWORD=Pass2020! -v ${HOME}/postgres-data/:/var/lib/postgresql/data -p 6001:5432 postgres`
 
 then rerunning that docker with this command:
