@@ -1,17 +1,13 @@
 package models
 
-type Response struct{
-	Message string  `json:"message"`
+type Response struct {
+	Message      string `json:"message"`
 	ResponseCode int    `json:"code"`
 	Error        bool   `json:"error"`
 }
 
-type GetResponse struct{
-	Response Response
-	Event Event
+type GetResponse struct {
+	Response   Response
+	Event      Event
 	DomainType string `json:"domain_type"`
 }
-
-
-
-

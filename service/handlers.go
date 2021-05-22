@@ -28,8 +28,9 @@ func NewBaseHandler(db *pgx.Conn) *BaseHandler {
 
 func (h *BaseHandler) DeliveredHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		errResp, domainName := getDomain(r)
+		errResp := false
+		domainName := getDomain(r)
+		resCode := http.StatusOK
 
 		err := h.updateOrCreate(domainName, 1, 0)
 		if err != nil {
@@ -37,9 +38,13 @@ func (h *BaseHandler) DeliveredHandler() http.HandlerFunc {
 			errResp = true
 		}
 
+		if errResp == true {
+			resCode = http.StatusInternalServerError
+		}
+
 		response := models.Response{
 			Message:      "Successfully updated domain name",
-			ResponseCode: http.StatusOK,
+			ResponseCode: resCode,
 			Error:        errResp,
 		}
 		js, err := json.Marshal(response)
@@ -48,13 +53,20 @@ func (h *BaseHandler) DeliveredHandler() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(js)
+		_, writeError := w.Write(js)
+
+		if writeError != nil {
+			fmt.Println("A write error occurred in DeliveredHandler", writeError)
+		}
 	}
 }
 
 func (h *BaseHandler) BouncedHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		errResp, domainName := getDomain(r)
+		errResp := false
+		domainName := getDomain(r)
+
+		resCode := http.StatusOK
 
 		err := h.updateOrCreate(domainName, 0, 1)
 		if err != nil {
@@ -62,9 +74,13 @@ func (h *BaseHandler) BouncedHandler() http.HandlerFunc {
 			fmt.Println("Error occurred in BounceHandler", err)
 		}
 
+		if errResp == true {
+			resCode = http.StatusInternalServerError
+		}
+
 		response := models.Response{
 			Message:      "Successfully updated domain name",
-			ResponseCode: http.StatusOK,
+			ResponseCode: resCode,
 			Error:        errResp,
 		}
 		js, err := json.Marshal(response)
@@ -73,14 +89,21 @@ func (h *BaseHandler) BouncedHandler() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(js)
+		_, writeError := w.Write(js)
+
+		if writeError != nil {
+			fmt.Println("A write error occurred in BouncedHandler", writeError)
+		}
 	}
 
 }
 
 func (h *BaseHandler) GetDomainHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		errResp, domainName := getDomain(r)
+		errResp := false
+		domainName := getDomain(r)
+
+		resCode := http.StatusOK
 
 		event, err := h.get(domainName)
 		if err != nil {
@@ -89,11 +112,14 @@ func (h *BaseHandler) GetDomainHandler() http.HandlerFunc {
 		}
 		domainType := determineDomain(event)
 
-		fmt.Println(event, domainType)
+		if errResp == true {
+			resCode = http.StatusInternalServerError
+		}
+
 		response := models.GetResponse{
 			Response: models.Response{
 				Message:      "Successfully updated domain name",
-				ResponseCode: http.StatusOK,
+				ResponseCode: resCode,
 				Error:        errResp,
 			},
 			Event:      event,
@@ -106,20 +132,23 @@ func (h *BaseHandler) GetDomainHandler() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(js)
+		_, writeError := w.Write(js)
+
+		if writeError != nil {
+			fmt.Println("A write error occurred in GetDomainHandler", writeError)
+		}
 	}
 }
 
-func getDomain(r *http.Request) (bool, string) {
+func getDomain(r *http.Request) string {
 	// get URL parameters
 	vars := mux.Vars(r)
-	errResp := false
 	// find the metric name
 	domainName := vars["domainName"]
 
 	fmt.Println("msg", "Domain name received", "name", domainName)
 
-	return errResp, domainName
+	return domainName
 }
 
 func determineDomain(event models.Event) string {
@@ -145,12 +174,14 @@ func (h *BaseHandler) updateOrCreate(domain string, deliveredIncrease int64, bou
 	err := h.db.QueryRow(context.Background(), "select exists(select 1 from events where domain=$1)", domain).Scan(&exists)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "QueryRow exists failed: %v\n", err)
+		return err
 	}
 	//does the entry exist?
 	if exists {
 		err = h.db.QueryRow(context.Background(), "select domain, delivered, bounced from events where domain=$1", domain).Scan(&domain, &delivered, &bounced)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "select row failed: %v\n", err)
+			return err
 		}
 		delivered = delivered + deliveredIncrease
 		bounced = bounced + bouncedIncrease
@@ -158,12 +189,14 @@ func (h *BaseHandler) updateOrCreate(domain string, deliveredIncrease int64, bou
 		_, err = h.db.Exec(context.Background(), "update events set delivered=$1, bounced=$2 where domain=$3", delivered, bounced, domain)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "update row failed: %v\n", err)
+			return err
 		}
 	} else {
 		//create entry
 		_, err = h.db.Exec(context.Background(), "insert into events(domain,delivered,bounced) values($1,$2,$3)", domain, deliveredIncrease, bouncedIncrease)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "create row failed: %v\n", err)
+			return err
 		}
 	}
 
@@ -175,11 +208,10 @@ func (h *BaseHandler) get(domain string) (models.Event, error) {
 	event := models.Event{
 		Domain: domain,
 	}
-	err := h.db.QueryRow(context.Background(), "select domain, delivered, bounced from events where domain=$1", "google.com").Scan(&event.Domain, &event.Delivered, &event.Bounced)
+	err := h.db.QueryRow(context.Background(), "select domain, delivered, bounced from events where domain=$1", event.Domain).Scan(&event.Domain, &event.Delivered, &event.Bounced)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "QueryRow1 failed: %v\n", err)
 	}
-	fmt.Println(event)
 
 	return event, err
 }

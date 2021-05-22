@@ -11,8 +11,7 @@ import (
 )
 
 var (
-	port   string
-	dbConn *repo.DB
+	port string
 )
 
 func main() {
@@ -22,6 +21,8 @@ func main() {
 	defer dbConn.Session.Close(context.Background())
 	if dbError != nil {
 		fmt.Println("msg", "Service failed to obtain database connection", "err", dbError)
+		// instead of panic here we can do some connection retry logic with an exponential back off after
+		// x amount of tries then we could panic/quit
 		panic("Service failed to obtain database connection")
 	}
 	fmt.Println("msg", "Get database connection complete.")
