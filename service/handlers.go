@@ -152,16 +152,15 @@ func getDomain(r *http.Request) string {
 }
 
 func determineDomain(event models.Event) string {
-	domainType := "unknown"
-	//receives more than 1000 “delivered” events
-	if event.Delivered > DomainThreshold {
-		domainType = "catch-all"
-	}
-	//A domain name is not a catch-all when it receives at least 1 “bounced” event
+	// A domain name is not a catch-all when it receives at least 1 “bounced” event
 	if event.Bounced >= BouncedThreshold {
-		domainType = "not catch-all"
+		return "not catch-all"
 	}
-	return domainType
+	// receives more than 1000 “delivered” events
+	if event.Delivered > DomainThreshold {
+		return "catch-all"
+	}
+	return "unknown"
 }
 
 // These could be abstracted into there own DB layer
